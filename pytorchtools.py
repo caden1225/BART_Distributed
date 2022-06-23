@@ -30,7 +30,7 @@ class EarlyStopping:
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            # self.save_checkpoint(val_loss, model)
         elif score < self.best_score + self.delta:
             self.counter += 1
             print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
@@ -38,16 +38,16 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            # self.save_checkpoint(val_loss, model)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model):
-        '''Saves model when validation loss decrease.'''
-        if self.verbose:
-            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        # save_path = join(self.save_path, "best_model")
-        # if not os.path.exists(save_path):
-        #     os.mkdir(save_path)
-        # model_to_save = model.module if hasattr(model, 'module') else model
-        # model_to_save.save_pretrained(save_path)
-        self.val_loss_min = val_loss
+    # def save_checkpoint(self, val_loss, model):
+    #     '''Saves model when validation loss decrease.'''
+    #     if self.verbose:
+    #         print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+    #     # save_path = join(self.save_path, "best_model")
+    #     # if not os.path.exists(save_path):
+    #     #     os.mkdir(save_path)
+    #     # model_to_save = model.module if hasattr(model, 'module') else model
+    #     # model_to_save.save_pretrained(save_path)
+    #     self.val_loss_min = val_loss

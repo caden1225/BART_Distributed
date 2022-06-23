@@ -25,7 +25,7 @@ from transformers import (
     get_linear_schedule_with_warmup
 )
 from transformers.models.bart.modeling_bart import shift_tokens_right
-from utils_dev import load_dataset
+from utils import load_dataset
 
 OVERSTEP = 0
 
@@ -33,7 +33,7 @@ def set_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--epochs', default=15, type=int, required=False, help='训练的最大轮次')
     parser.add_argument('--batch_size', default=64, type=int, required=False, help='训练的batch size')
-    parser.add_argument('--log_step', default=20, type=int, required=False, help='多少步汇报一次loss')
+    parser.add_argument('--log_step', default=200, type=int, required=False, help='多少步汇报一次loss')
 
     parser.add_argument('--data_path', default='/zhengdong3/data/data_D_json_10files', type=str, required=False, help='训练集路径')
     parser.add_argument('--save_model_path', default='/zhengdong3/projects/BART_Distributed_multi/model_dist_multi', type=str, required=False,
@@ -383,4 +383,4 @@ if __name__ == '__main__':
 
     main()
     # mp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
-# run with """python -m torch.distributed.launch --nnodes=2 --nproc_per_node 4 --node_rank=0 --master_addr=12.234.154.239 --master_port=33331 train_dist.py"""
+# run with """python -m torch.distributed.launch --nnodes=2 --nproc_per_node 4 --node_rank=0 --master_addr=12.234.154.239 --master_port=33331 train_dist_AIS.py"""

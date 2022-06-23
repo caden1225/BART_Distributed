@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time    : 2022/6/22 下午1:37
+# @Time    : 2022/5/31 下午1:37
 # @Author  : caden1225
 # @File    : train_single.py
-# @Description : colossalai training in distributed_2d_parallel
+# @Description : colossalai training in distributed
 import colossalai
 import os
 import torch
 import time
 import numpy as np
 import torch.distributed as dist
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.functional import log_softmax
 from transformers import (
@@ -20,18 +21,11 @@ from colossalai.core import global_context as gpc
 from colossalai.logging import get_dist_logger
 from colossalai.utils import get_dataloader
 from colossalai.nn.lr_scheduler import LinearWarmupLR
-from utils_dev import load_dataset, collate_fn
+from utils import load_dataset, collate_fn
 
 def get_time_stamp():
     torch.cuda.synchronize()
     return time.time()
-
-
-def calc_local_model_size(model: torch.nn.Module):
-    numel_per_device = 0
-    for p in model.parameters():
-        numel_per_device += p.numel()
-    return numel_per_device
 
 
 def set_args():
@@ -42,7 +36,7 @@ def set_args():
     # parser.add_argument('--model_config', default='config/raw_BART_config.json', type=str, required=False,
     #                     help='设置模型参数')
     parser.add_argument('--data_path', default='/zhengdong3/data/data_D_json_10files', type=str, required=False, help='训练集路径')
-    parser.add_argument('--colossal_config', default='/zhengdong3/projects/BART_Distributed_multi/config/config_2d.py', type=str, required=False, help='训练集路径')
+    parser.add_argument('--colossal_config', default='/zhengdong3/projects/BART_Distributed_multi/config/config_amp.py', type=str, required=False, help='训练集路径')
     parser.add_argument('--save_model_path', default='/zhengdong3/projects/BART_Distributed_multi/model_colossal_dist', type=str, required=False,
                         help='模型输出路径')
     parser.add_argument('--pretrained_model', default='/zhengdong3/pretrained_model/min_ppl_model', type=str, required=False,
@@ -59,7 +53,7 @@ def set_args():
 
     parser.add_argument('--vocab_path', default='/zhengdong3/pretrained_model/HF_BART_large', type=str, required=False,
                         help='词表路径')
-    parser.add_argument('--val_rate', type=float, default=0.01, help='验证集比例')
+    parser.add_argument('--val_rate', type=float, default=0.001, help='验证集比例')
     parser.add_argument('--num_workers', type=int, default=1, required=False, help="dataloader加载数据时使用的线程数量")
 
     args = parser.parse_args()
@@ -100,10 +94,8 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=0):
     return loss, nll_loss
 
 
-from colossalai.logging import disable_existing_loggers
 def main():
     args = set_args()
-    disable_existing_loggers()
     colossalai.launch_from_torch(config=args.colossal_config)
 
     logger = get_dist_logger()
@@ -112,6 +104,7 @@ def main():
     tb_writer = SummaryWriter(log_dir=args.tb_log_dir)
 
     # from colossalai.zero.init_ctx import ZeroInitContext
+    #
     # with ZeroInitContext(target_device=torch.cuda.current_device(),
     #                      shard_strategy=gpc.config.zero.model_config.shard_strategy,
     #                      shard_param=True):
@@ -128,16 +121,14 @@ def main():
     train_loader = get_dataloader(
         dataset=train_dataset,
         batch_size=gpc.config.BATCH_SIZE,
-        shuffle=True,
+        shuffle=False,
         pin_memory=True,
-        drop_last=True
     )
-    validate_loader = get_dataloader(
+    validate_loader = DataLoader(
         dataset=validate_dataset,
         batch_size=gpc.config.BATCH_SIZE,
-        shuffle=True,
+        shuffle=False,
         pin_memory=True,
-        drop_last=True
     )
 
     args.pad_token_id = 0
@@ -157,6 +148,11 @@ def main():
     )
     if gpc.get_global_rank() == 0:
         logger.info(f"start training with total step is {total_steps} with {gpc.config.NUM_EPOCHS} epochs")
+
+    print("world_size---- '{}'".format(args.world_size))
+    print("LOCAL_RANK---- '{}'".format(args.local_rank))
+    print("RANK num---- '{}'".format(args.rank))
+    print("###"*30)
 
     best_val_loss = 10000
     overstep = 0
@@ -187,9 +183,6 @@ def main():
                 ignore_index=args.pad_token_id
             )
             reduced_loss,reducded_nll_loss = scaled_all_reduce([train_loss, nll_loss])
-            print("$"*30)
-            print(train_loss)
-            print(reduced_loss)
 
             train_losses.append(reduced_loss.item())
             step_loss.append(reduced_loss.item())
@@ -275,5 +268,5 @@ if __name__ == "__main__":
     # os.environ['MASTER_ADDR'] = 'localhost'
     # os.environ['MASTER_PORT'] = '12354'
     main()
-# colossalai run --nproc_per_node 8 train_colossal_2d.py
-# python -m torch.distributed.launch --nproc_per_node 2 train_colossal_2d.py
+# colossalai run --nproc_per_node 8 train_colossal_amp.py
+# python -m torch.distributed.launch --nproc_per_node 2 train_colossal_amp.py
